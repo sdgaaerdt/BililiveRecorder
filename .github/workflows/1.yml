@@ -21,22 +21,30 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Build WebUI
-        run: ./webui/build.sh
-
       - name: Build on FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
           usesh: true
           prepare: |
-            pkg install -y curl
-            curl -sSL https://dot.net/v1/dotnet-install.sh | sh -s -- --channel 8.0
+            # 安装基本依赖
+            pkg install -y curl bash npm node python3
+            
+            # 安装 .NET SDK
+            curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 8.0
             echo 'export PATH="$HOME/.dotnet:$PATH"' >> ~/.profile
             . ~/.profile
 
           run: |
+            # 构建 WebUI
+            cd webui
+            npm install
+            npm run build
+            cd ..
+            
+            # 构建 .NET 项目
             dotnet --info
             dotnet restore
+            
             # Debug build
             dotnet publish -c Debug BililiveRecorder.Cli/BililiveRecorder.Cli.csproj \
               --self-contained true \
