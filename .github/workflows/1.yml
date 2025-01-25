@@ -27,32 +27,54 @@ jobs:
           usesh: true
           prepare: |
             # 安装基本依赖
-            pkg install -y curl bash npm node python3
+            pkg update
+            pkg upgrade -y
+            pkg install -y curl bash npm node python3 git
+            
+            # 显示环境信息
+            echo "Current directory: $(pwd)"
+            echo "PATH: $PATH"
+            echo "Shell: $SHELL"
             
             # 安装 .NET SDK
-            curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 8.0
-            echo 'export PATH="$HOME/.dotnet:$PATH"' >> ~/.profile
+            curl -sSL https://dot.net/v1/dotnet-install.sh > dotnet-install.sh
+            chmod +x dotnet-install.sh
+            ./dotnet-install.sh --channel 8.0
+            
+            # 设置环境变量
+            DOTNET_ROOT=$HOME/.dotnet
+            PATH=$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools
+            echo "export DOTNET_ROOT=$DOTNET_ROOT" >> ~/.profile
+            echo "export PATH=$PATH" >> ~/.profile
             . ~/.profile
 
           run: |
+            # 显示环境信息
+            pwd
+            ls -la
+            echo "PATH: $PATH"
+            which dotnet
+            which npm
+            
             # 构建 WebUI
             cd webui
-            npm install
-            npm run build
+            echo "Building WebUI in $(pwd)"
+            /usr/local/bin/npm install
+            /usr/local/bin/npm run build
             cd ..
             
             # 构建 .NET 项目
-            dotnet --info
-            dotnet restore
+            $HOME/.dotnet/dotnet --info
+            $HOME/.dotnet/dotnet restore
             
             # Debug build
-            dotnet publish -c Debug BililiveRecorder.Cli/BililiveRecorder.Cli.csproj \
+            $HOME/.dotnet/dotnet publish -c Debug BililiveRecorder.Cli/BililiveRecorder.Cli.csproj \
               --self-contained true \
               /p:PublishSingleFile=true \
               /p:PublishTrimmed=true
             
             # Release build
-            dotnet publish -c Release BililiveRecorder.Cli/BililiveRecorder.Cli.csproj \
+            $HOME/.dotnet/dotnet publish -c Release BililiveRecorder.Cli/BililiveRecorder.Cli.csproj \
               --self-contained true \
               /p:PublishSingleFile=true \
               /p:PublishTrimmed=true
