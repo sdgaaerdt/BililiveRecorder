@@ -26,10 +26,16 @@ jobs:
         with:
           usesh: true
           prepare: |
+            # 设置 pkg 自动确认
+            export ASSUME_ALWAYS_YES=yes
+            
             # 安装基本依赖
             pkg update
             pkg upgrade -y
             pkg install -y bash gmake cmake ninja pkgconf python3 git node npm icu libunwind libinotify openssl ca_root_nss
+            
+            # 安装额外依赖
+            pkg install -y autoconf automake libtool binutils wget llvm15 grpc protobuf openjdk11 node20 npm-node20
             
             # 显示环境信息
             echo "Current directory: $(pwd)"
@@ -91,7 +97,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: DotNet-FreeBSD-SDK
-          path: dotnet-freebsd-build/installer/artifacts/packages/Release/Shipping/
+          path: dotnet-core-freebsd-source-build/installer/artifacts/packages/Release/Shipping/
           if-no-files-found: error
 
       - name: Upload App Artifacts
