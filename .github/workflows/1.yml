@@ -10,55 +10,55 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_GENERATE_ASPNET_CERTIFICATE: false
-  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
 jobs:
   build_freebsd:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [x64]
-        include:
-          - arch: x64
-            rid: freebsd-x64
-    
+    name: Build on FreeBSD
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
-
       - name: Build WebUI
         run: ./webui/build.sh
 
-      - name: Build CLI - Debug
-        run: |
-          dotnet publish -c Debug -r ${{ matrix.rid }} \
-          /p:PublishSingleFile=true \
-          /p:PublishTrimmed=true \
-          BililiveRecorder.Cli/BililiveRecorder.Cli.csproj
+      - name: Build on FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          usesh: true
+          prepare: |
+            pkg install -y curl
+            curl -sSL https://dot.net/v1/dotnet-install.sh | sh -s -- --channel 8.0
+            echo 'export PATH="$HOME/.dotnet:$PATH"' >> ~/.profile
+            . ~/.profile
 
-      - name: Build CLI - Release
-        run: |
-          dotnet publish -c Release -r ${{ matrix.rid }} \
-          /p:PublishSingleFile=true \
-          /p:PublishTrimmed=true \
-          BililiveRecorder.Cli/BililiveRecorder.Cli.csproj
+          run: |
+            dotnet --info
+            dotnet restore
+            # Debug build
+            dotnet publish -c Debug BililiveRecorder.Cli/BililiveRecorder.Cli.csproj \
+              --self-contained true \
+              /p:PublishSingleFile=true \
+              /p:PublishTrimmed=true
+            
+            # Release build
+            dotnet publish -c Release BililiveRecorder.Cli/BililiveRecorder.Cli.csproj \
+              --self-contained true \
+              /p:PublishSingleFile=true \
+              /p:PublishTrimmed=true
 
       - name: Upload Artifacts - Debug
         uses: actions/upload-artifact@v3
         with:
-          name: CLI-${{ matrix.rid }}-Debug
-          path: BililiveRecorder.Cli/bin/Debug/net*/${{ matrix.rid }}/publish/
+          name: CLI-FreeBSD-Debug
+          path: BililiveRecorder.Cli/bin/Debug/net*/publish/
           if-no-files-found: error
 
       - name: Upload Artifacts - Release
         uses: actions/upload-artifact@v3
         with:
-          name: CLI-${{ matrix.rid }}-Release
-          path: BililiveRecorder.Cli/bin/Release/net*/${{ matrix.rid }}/publish/
+          name: CLI-FreeBSD-Release
+          path: BililiveRecorder.Cli/bin/Release/net*/publish/
           if-no-files-found: error
