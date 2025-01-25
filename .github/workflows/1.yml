@@ -21,13 +21,6 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Checkout dotnet-core-freebsd-source-build
-        uses: actions/checkout@v3
-        with:
-          repository: sec/dotnet-core-freebsd-source-build
-          ref: v8
-          path: dotnet-freebsd-build
-
       - name: Build on FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
@@ -36,20 +29,23 @@ jobs:
             # 安装基本依赖
             pkg update
             pkg upgrade -y
-            pkg install -y bash gmake cmake ninja pkgconf python3 git node npm icu libunwind libinotify openssl
+            pkg install -y bash gmake cmake ninja pkgconf python3 git node npm icu libunwind libinotify openssl ca_root_nss
             
             # 显示环境信息
             echo "Current directory: $(pwd)"
             echo "PATH: $PATH"
             echo "Shell: $SHELL"
             
+            # 克隆 dotnet-core-freebsd-source-build 仓库
+            git clone --depth 1 -b v8 https://github.com/sec/dotnet-core-freebsd-source-build.git
+            
             # 运行安装工具脚本
-            cd dotnet-freebsd-build
+            cd dotnet-core-freebsd-source-build
             chmod +x install_tools.sh
             ./install_tools.sh
 
           run: |
-            cd dotnet-freebsd-build
+            cd dotnet-core-freebsd-source-build
             
             # 初始化构建环境
             chmod +x init.sh
@@ -71,12 +67,12 @@ jobs:
             chmod +x gather_output.sh
             ./gather_output.sh
             
-            # 复制构建结果到项目目录
+            # 复制项目文件到当前目录
             cd ..
-            cp -r dotnet-freebsd-build/installer/artifacts/packages/Release/Shipping/* .
+            cp -r /root/workspace/* .
             
             # 使用新构建的 SDK 编译项目
-            export PATH=$PATH:$(pwd)/dotnet-freebsd-build/installer/artifacts/packages/Release/Shipping
+            export PATH=$PATH:$(pwd)/dotnet-core-freebsd-source-build/installer/artifacts/packages/Release/Shipping
             
             # 构建 WebUI
             cd webui
