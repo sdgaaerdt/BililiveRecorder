@@ -21,6 +21,13 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Checkout dotnet-core-freebsd-source-build
+        uses: actions/checkout@v3
+        with:
+          repository: sec/dotnet-core-freebsd-source-build
+          ref: v8
+          path: dotnet-freebsd-build
+
       - name: Build on FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
@@ -29,66 +36,71 @@ jobs:
             # 安装基本依赖
             pkg update
             pkg upgrade -y
-            pkg install -y curl bash npm node python3 git
+            pkg install -y bash gmake cmake ninja pkgconf python3 git node npm icu libunwind libinotify openssl
             
             # 显示环境信息
             echo "Current directory: $(pwd)"
             echo "PATH: $PATH"
             echo "Shell: $SHELL"
             
-            # 安装 .NET SDK
-            curl -sSL https://dot.net/v1/dotnet-install.sh > dotnet-install.sh
-            chmod +x dotnet-install.sh
-            ./dotnet-install.sh --channel 8.0
-            
-            # 设置环境变量
-            DOTNET_ROOT=$HOME/.dotnet
-            PATH=$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools
-            echo "export DOTNET_ROOT=$DOTNET_ROOT" >> ~/.profile
-            echo "export PATH=$PATH" >> ~/.profile
-            . ~/.profile
+            # 运行安装工具脚本
+            cd dotnet-freebsd-build
+            chmod +x install_tools.sh
+            ./install_tools.sh
 
           run: |
-            # 显示环境信息
-            pwd
-            ls -la
-            echo "PATH: $PATH"
-            which dotnet
-            which npm
+            cd dotnet-freebsd-build
+            
+            # 初始化构建环境
+            chmod +x init.sh
+            ./init.sh
+            
+            # 构建运行时
+            chmod +x build_runtime.sh
+            ./build_runtime.sh -v d
+            
+            # 构建 SDK
+            chmod +x build_sdk.sh
+            ./build_sdk.sh
+            
+            # 构建安装程序
+            chmod +x build_installer_without_aspnet.sh
+            ./build_installer_without_aspnet.sh
+            
+            # 收集输出文件
+            chmod +x gather_output.sh
+            ./gather_output.sh
+            
+            # 复制构建结果到项目目录
+            cd ..
+            cp -r dotnet-freebsd-build/installer/artifacts/packages/Release/Shipping/* .
+            
+            # 使用新构建的 SDK 编译项目
+            export PATH=$PATH:$(pwd)/dotnet-freebsd-build/installer/artifacts/packages/Release/Shipping
             
             # 构建 WebUI
             cd webui
-            echo "Building WebUI in $(pwd)"
-            /usr/local/bin/npm install
-            /usr/local/bin/npm run build
+            npm install
+            npm run build
             cd ..
             
-            # 构建 .NET 项目
-            $HOME/.dotnet/dotnet --info
-            $HOME/.dotnet/dotnet restore
-            
-            # Debug build
-            $HOME/.dotnet/dotnet publish -c Debug BililiveRecorder.Cli/BililiveRecorder.Cli.csproj \
-              --self-contained true \
-              /p:PublishSingleFile=true \
-              /p:PublishTrimmed=true
-            
-            # Release build
-            $HOME/.dotnet/dotnet publish -c Release BililiveRecorder.Cli/BililiveRecorder.Cli.csproj \
+            # 构建项目
+            dotnet restore
+            dotnet publish -c Release BililiveRecorder.Cli/BililiveRecorder.Cli.csproj \
               --self-contained true \
               /p:PublishSingleFile=true \
               /p:PublishTrimmed=true
 
-      - name: Upload Artifacts - Debug
+      - name: Upload SDK Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: CLI-FreeBSD-Debug
-          path: BililiveRecorder.Cli/bin/Debug/net*/publish/
+          name: DotNet-FreeBSD-SDK
+          path: dotnet-freebsd-build/installer/artifacts/packages/Release/Shipping/
           if-no-files-found: error
 
-      - name: Upload Artifacts - Release
+      - name: Upload App Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: CLI-FreeBSD-Release
+          name: BililiveRecorder-FreeBSD
           path: BililiveRecorder.Cli/bin/Release/net*/publish/
           if-no-files-found: error
