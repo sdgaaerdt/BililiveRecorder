@@ -1,19 +1,10 @@
-name: Cross Compile for FreeBSD
+name: Build for FreeBSD
 
 on:
-  workflow_dispatch:
   push:
-    branches: [ master, main ]
-    paths-ignore:
-      - '**.md'
-      - '.github/**'
-      - '!.github/workflows/cross-compile-freebsd.yml'
+    branches:
+      - "**"
   pull_request:
-    branches: [ master, main ]
-    paths-ignore:
-      - '**.md'
-      - '.github/**'
-      - '!.github/workflows/cross-compile-freebsd.yml'
 
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -22,28 +13,24 @@ env:
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
 jobs:
-  cross_compile:
+  build_freebsd:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [x64, arm64]
+        arch: [x64]
         include:
           - arch: x64
             rid: freebsd-x64
-          - arch: arm64
-            rid: freebsd-arm64
-
+    
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
           submodules: recursive
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8.0.x'
 
       - name: Build WebUI
         run: ./webui/build.sh
@@ -51,27 +38,27 @@ jobs:
       - name: Build CLI - Debug
         run: |
           dotnet publish -c Debug -r ${{ matrix.rid }} \
-            --self-contained true \
-            /p:PublishSingleFile=true \
-            BililiveRecorder.Cli/BililiveRecorder.Cli.csproj
+          /p:PublishSingleFile=true \
+          /p:PublishTrimmed=true \
+          BililiveRecorder.Cli/BililiveRecorder.Cli.csproj
 
       - name: Build CLI - Release
         run: |
           dotnet publish -c Release -r ${{ matrix.rid }} \
-            --self-contained true \
-            /p:PublishSingleFile=true \
-            BililiveRecorder.Cli/BililiveRecorder.Cli.csproj
+          /p:PublishSingleFile=true \
+          /p:PublishTrimmed=true \
+          BililiveRecorder.Cli/BililiveRecorder.Cli.csproj
 
-      - name: Upload Debug Artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload Artifacts - Debug
+        uses: actions/upload-artifact@v3
         with:
-          name: BililiveRecorder-FreeBSD-${{ matrix.arch }}-Debug
-          path: BililiveRecorder.Cli/bin/Debug/net8.0/${{ matrix.rid }}/publish/
+          name: CLI-${{ matrix.rid }}-Debug
+          path: BililiveRecorder.Cli/bin/Debug/net*/${{ matrix.rid }}/publish/
           if-no-files-found: error
 
-      - name: Upload Release Artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload Artifacts - Release
+        uses: actions/upload-artifact@v3
         with:
-          name: BililiveRecorder-FreeBSD-${{ matrix.arch }}-Release
-          path: BililiveRecorder.Cli/bin/Release/net8.0/${{ matrix.rid }}/publish/
-          if-no-files-found: error 
+          name: CLI-${{ matrix.rid }}-Release
+          path: BililiveRecorder.Cli/bin/Release/net*/${{ matrix.rid }}/publish/
+          if-no-files-found: error
