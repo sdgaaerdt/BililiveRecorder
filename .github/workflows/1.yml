@@ -1,0 +1,77 @@
+name: Cross Compile for FreeBSD
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master, main ]
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+      - '!.github/workflows/cross-compile-freebsd.yml'
+  pull_request:
+    branches: [ master, main ]
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+      - '!.github/workflows/cross-compile-freebsd.yml'
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_GENERATE_ASPNET_CERTIFICATE: false
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+jobs:
+  cross_compile:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+        include:
+          - arch: x64
+            rid: freebsd-x64
+          - arch: arm64
+            rid: freebsd-arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build WebUI
+        run: ./webui/build.sh
+
+      - name: Build CLI - Debug
+        run: |
+          dotnet publish -c Debug -r ${{ matrix.rid }} \
+            --self-contained true \
+            /p:PublishSingleFile=true \
+            BililiveRecorder.Cli/BililiveRecorder.Cli.csproj
+
+      - name: Build CLI - Release
+        run: |
+          dotnet publish -c Release -r ${{ matrix.rid }} \
+            --self-contained true \
+            /p:PublishSingleFile=true \
+            BililiveRecorder.Cli/BililiveRecorder.Cli.csproj
+
+      - name: Upload Debug Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BililiveRecorder-FreeBSD-${{ matrix.arch }}-Debug
+          path: BililiveRecorder.Cli/bin/Debug/net8.0/${{ matrix.rid }}/publish/
+          if-no-files-found: error
+
+      - name: Upload Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BililiveRecorder-FreeBSD-${{ matrix.arch }}-Release
+          path: BililiveRecorder.Cli/bin/Release/net8.0/${{ matrix.rid }}/publish/
+          if-no-files-found: error 
